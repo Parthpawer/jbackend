@@ -1,0 +1,155 @@
+import uuid
+from django.db import models
+
+
+class Category(models.Model):
+    """Top-level product category (e.g. Rings, Necklaces, Bangles)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    image = models.ImageField(upload_to='categories/', null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'categories'
+        verbose_name = 'Category'
+        verbose_name_plural = 'Categories'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else ''
+
+
+class Subcategory(models.Model):
+    """Subcategory under a top-level category."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    image = models.ImageField(upload_to='subcategories/', null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'subcategories'
+        verbose_name = 'Subcategory'
+        verbose_name_plural = 'Subcategories'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return f'{self.category.name} → {self.name}'
+
+    @property
+    def image_url(self):
+        return self.image.url if self.image else ''
+
+
+class Product(models.Model):
+    """A jewelry product."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
+    subcategory = models.ForeignKey(
+        Subcategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    base_price = models.DecimalField(max_digits=12, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'products'
+        verbose_name = 'Product'
+        verbose_name_plural = 'Products'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def primary_image(self):
+        img = self.images.filter(is_primary=True).first()
+        if not img:
+            img = self.images.first()
+        return img.cloudinary_url if img else ''
+
+    @property
+    def min_price(self):
+        variant = self.variants.order_by('price').first()
+        return variant.price if variant else self.base_price
+
+    @property
+    def total_stock(self):
+        return self.variants.aggregate(total=models.Sum('stock'))['total'] or 0
+
+
+class ProductVariant(models.Model):
+    """Variant of a product (different metal, size, etc.)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    metal_type = models.CharField(max_length=100, help_text='e.g. 18k Rose Gold, 22k Gold')
+    size = models.CharField(max_length=50, blank=True, default='', help_text='Ring size, bangle diameter, etc.')
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    stock = models.IntegerField(default=0)
+    sku = models.CharField(max_length=50, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'product_variants'
+        verbose_name = 'Product Variant'
+        verbose_name_plural = 'Product Variants'
+
+    def __str__(self):
+        parts = [self.metal_type]
+        if self.size:
+            parts.append(f'Size {self.size}')
+        return f'{self.product.name} — {", ".join(parts)}'
+
+    def save(self, *args, **kwargs):
+        import logging
+        logger = logging.getLogger('apps.products')
+        super().save(*args, **kwargs)
+        if self.stock < 5:
+            logger.warning(
+                f'LOW STOCK ALERT: {self.product.name} ({self.sku}) — only {self.stock} left'
+            )
+
+
+class ProductImage(models.Model):
+    """Image for a product, stored on Cloudinary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='products/')
+    is_primary = models.BooleanField(default=False)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def cloudinary_url(self):
+        return self.image.url if self.image else ''
+
+    class Meta:
+        db_table = 'product_images'
+        verbose_name = 'Product Image'
+        verbose_name_plural = 'Product Images'
+        ordering = ['display_order']
+
+    def __str__(self):
+        return f'{self.product.name} — Image {self.display_order}'
