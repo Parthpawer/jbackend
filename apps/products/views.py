@@ -2,12 +2,14 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
-from .models import Category, Subcategory, Product
+from .models import Category, Subcategory, Product, HeroSlider, InstagramPost
 from .serializers import (
     CategorySerializer,
     SubcategorySerializer,
     ProductListSerializer,
     ProductDetailSerializer,
+    HeroSliderSerializer,
+    InstagramPostSerializer,
 )
 from .filters import ProductFilter
 
@@ -160,3 +162,76 @@ class SubcategoryProductsView(generics.ListAPIView):
             'data': response.data,
             'message': 'Subcategory products retrieved',
         })
+
+
+class HeroSliderListView(generics.ListAPIView):
+    """GET /api/products/homepage/hero/ — Active hero sliders."""
+    permission_classes = [AllowAny]
+    serializer_class = HeroSliderSerializer
+
+    def get_queryset(self):
+        return HeroSlider.objects.filter(is_active=True).order_by('display_order')
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return api_response(response.data, 'Hero sliders retrieved')
+
+
+class InstagramPostListView(generics.ListAPIView):
+    """GET /api/products/homepage/instagram/ — Active instagram posts."""
+    permission_classes = [AllowAny]
+    serializer_class = InstagramPostSerializer
+
+    def get_queryset(self):
+        return InstagramPost.objects.filter(is_active=True).order_by('display_order')
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return api_response(response.data, 'Instagram posts retrieved')
+
+
+class BestSellerListView(generics.ListAPIView):
+    """GET /api/products/homepage/bestsellers/ — Top 5 best selling products."""
+    permission_classes = [AllowAny]
+    serializer_class = ProductListSerializer
+
+    def get_queryset(self):
+        return Product.objects.filter(
+            is_active=True, 
+            is_bestseller=True
+        ).select_related('category', 'subcategory')[:5]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return api_response(response.data, 'Best sellers retrieved')
+
+
+class QuickPicksListView(generics.ListAPIView):
+    """GET /api/products/homepage/quick-picks/ — Top 5 quick picks products."""
+    permission_classes = [AllowAny]
+    serializer_class = ProductListSerializer
+
+    def get_queryset(self):
+        return Product.objects.filter(
+            is_active=True, 
+            is_quick_pick=True
+        ).select_related('category', 'subcategory')[:5]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return api_response(response.data, 'Quick picks retrieved')
+
+
+class NewArrivalsListView(generics.ListAPIView):
+    """GET /api/products/homepage/new-arrivals/ — Top 5 newest products."""
+    permission_classes = [AllowAny]
+    serializer_class = ProductListSerializer
+
+    def get_queryset(self):
+        return Product.objects.filter(
+            is_active=True
+        ).select_related('category', 'subcategory').order_by('-created_at')[:5]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return api_response(response.data, 'New arrivals retrieved')

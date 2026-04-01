@@ -67,6 +67,8 @@ class Product(models.Model):
     description = models.TextField()
     base_price = models.DecimalField(max_digits=12, decimal_places=2)
     is_active = models.BooleanField(default=True)
+    is_bestseller = models.BooleanField(default=False)
+    is_quick_pick = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -152,4 +154,56 @@ class ProductImage(models.Model):
         ordering = ['display_order']
 
     def __str__(self):
-        return f'{self.product.name} — Image {self.display_order}'
+        return f"{self.product.name} Image"
+
+
+class HeroSlider(models.Model):
+    """Dynamic hero images for the homepage."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    image = models.ImageField(upload_to='hero_sliders/')
+    title = models.CharField(max_length=255, blank=True, default='')
+    subtitle = models.CharField(max_length=255, blank=True, default='')
+    link_url = models.CharField(max_length=500, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'hero_sliders'
+        verbose_name = 'Hero Slider'
+        verbose_name_plural = 'Hero Sliders'
+        ordering = ['display_order']
+
+    def __str__(self):
+        return self.title or f"Slider {self.display_order}"
+
+    @property
+    def cloudinary_url(self):
+        return self.image.url if self.image else ''
+
+
+class InstagramPost(models.Model):
+    """Instagram gallery images for the homepage."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    image = models.ImageField(upload_to='instagram_gallery/')
+    link_url = models.CharField(max_length=500, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'instagram_posts'
+        verbose_name = 'Instagram Post'
+        verbose_name_plural = 'Instagram Posts'
+        ordering = ['display_order']
+
+    def __str__(self):
+        return f"Instagram Post {self.display_order}"
+
+    @property
+    def cloudinary_url(self):
+        return self.image.url if self.image else ''
+
+
+# Load signals to ensure Next.js cache is purged on save
+import apps.products.signals

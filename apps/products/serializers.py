@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Subcategory, Product, ProductVariant, ProductImage
+from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -30,7 +30,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             'id', 'name', 'base_price', 'min_price', 'primary_image',
-            'category_name', 'subcategory_name', 'created_at'
+            'category_name', 'subcategory_name', 'is_bestseller', 'created_at'
         )
 
 
@@ -47,7 +47,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = (
-            'id', 'name', 'description', 'base_price', 'is_active',
+            'id', 'name', 'description', 'base_price', 'is_active', 'is_bestseller',
             'category', 'category_name', 'category_slug',
             'subcategory', 'subcategory_name', 'subcategory_slug',
             'images', 'variants', 'total_stock', 'created_at'
@@ -83,3 +83,15 @@ class CategoryListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ('id', 'name', 'slug', 'image_url', 'display_order')
+
+
+class HeroSliderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeroSlider
+        fields = ('id', 'title', 'subtitle', 'link_url', 'cloudinary_url', 'display_order')
+
+
+class InstagramPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InstagramPost
+        fields = ('id', 'link_url', 'cloudinary_url', 'display_order')
