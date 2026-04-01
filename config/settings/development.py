@@ -9,8 +9,8 @@ ALLOWED_HOSTS = ['*']
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Use real SMTP email backend in development (for OTP verification)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Inherit the Resend Email Backend from base.py
+# EMAIL_BACKEND no longer needs an override here
 
 # Disable throttling in development
 REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []

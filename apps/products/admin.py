@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Subcategory, Product, ProductVariant, ProductImage
+from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost
 
 
 class SubcategoryInline(admin.TabularInline):
@@ -40,8 +40,8 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'subcategory', 'base_price', 'is_active', 'total_stock', 'created_at')
-    list_filter = ('is_active', 'category', 'subcategory', 'created_at')
+    list_display = ('name', 'category', 'subcategory', 'base_price', 'is_bestseller', 'is_quick_pick', 'is_active', 'total_stock', 'created_at')
+    list_filter = ('is_active', 'is_bestseller', 'is_quick_pick', 'category', 'subcategory', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('id', 'created_at', 'updated_at')
     inlines = [ProductVariantInline, ProductImageInline]
@@ -54,7 +54,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('category', 'subcategory')
         }),
         ('Status', {
-            'fields': ('is_active',)
+            'fields': ('is_active', 'is_bestseller', 'is_quick_pick')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -78,3 +78,17 @@ class ProductVariantAdmin(admin.ModelAdmin):
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ('product', 'is_primary', 'display_order')
     list_filter = ('is_primary',)
+
+
+@admin.register(HeroSlider)
+class HeroSliderAdmin(admin.ModelAdmin):
+    list_display = ('title', 'subtitle', 'is_active', 'display_order', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('title', 'subtitle')
+
+
+@admin.register(InstagramPost)
+class InstagramPostAdmin(admin.ModelAdmin):
+    list_display = ('id', 'link_url', 'is_active', 'display_order', 'created_at')
+    list_filter = ('is_active',)
+

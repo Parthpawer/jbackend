@@ -21,9 +21,22 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Database
 import dj_database_url  # noqa: E402
-DATABASES = {
-    'default': dj_database_url.parse(config('DATABASE_URL'), conn_max_age=600)
-}
+# Database configuration – use PostgreSQL if DATABASE_URL is set, otherwise fall back to SQLite for local/dev
+_db_url = config('DATABASE_URL', default='')
+if _db_url:
+    DATABASES = {
+        'default': dj_database_url.parse(_db_url, conn_max_age=600)
+    }
+else:
+    # Simple SQLite fallback (useful for local testing of production settings)
+    from pathlib import Path
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Static files
 STORAGES = {

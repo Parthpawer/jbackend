@@ -16,3 +16,5 @@ Pillow==10.4.0
 django-ratelimit==4.1.0
 dj-database-url==2.2.0
 setuptools>=65.0.0
+django-anymail[resend]==11.1
+resend==2.1.0
