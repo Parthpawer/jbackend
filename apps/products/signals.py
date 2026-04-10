@@ -1,5 +1,6 @@
 import logging
 import requests
+from django.db import transaction
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.conf import settings
@@ -23,6 +24,8 @@ def revalidate_nextjs(tags):
         )
         return
 
+    frontend_url = frontend_url.rstrip('/')
+
     for tag in tags:
         try:
             response = requests.post(
@@ -31,28 +34,37 @@ def revalidate_nextjs(tags):
                 timeout=5,
             )
             if response.status_code == 200:
-                logger.info(f"✅ Revalidated Next.js cache tag: '{tag}'")
+                logger.info("Revalidated Next.js cache tag: '%s'", tag)
             elif response.status_code == 401:
                 logger.error(
-                    f"❌ Revalidation UNAUTHORIZED for tag '{tag}'. "
-                    "Check that REVALIDATION_SECRET matches on both Django and Vercel."
+                    "Revalidation unauthorized for tag '%s'. "
+                    "Check that REVALIDATION_SECRET matches on both Django and Vercel.",
+                    tag,
                 )
             else:
                 logger.warning(
-                    f"⚠️ Revalidation returned {response.status_code} for tag '{tag}': {response.text}"
+                    "Revalidation returned %s for tag '%s': %s",
+                    response.status_code,
+                    tag,
+                    response.text,
                 )
         except requests.exceptions.ConnectionError:
             logger.error(
-                f"❌ Could not connect to Next.js frontend at {frontend_url} "
-                f"to revalidate tag '{tag}'. Is FRONTEND_URL set correctly?"
+                "Could not connect to Next.js frontend at %s to revalidate tag '%s'. "
+                "Is FRONTEND_URL set correctly?",
+                frontend_url,
+                tag,
             )
         except Exception as e:
-            logger.error(f"❌ Unexpected error revalidating tag '{tag}': {e}")
+            logger.error("Unexpected error revalidating tag '%s': %s", tag, e)
 
 
-# ──────────────────────────────────────────────
+def revalidate_after_commit(tags):
+    """Run Next.js cache invalidation only after the DB transaction commits."""
+    transaction.on_commit(lambda: revalidate_nextjs(tags))
+
+
 # Product signals
-# ──────────────────────────────────────────────
 from .models import Product, Category, Subcategory, ProductVariant, ProductImage, InstagramPost, HeroSlider  # noqa: E402
 
 
@@ -61,23 +73,23 @@ from .models import Product, Category, Subcategory, ProductVariant, ProductImage
 @receiver([post_save, post_delete], sender=ProductImage)
 def product_changed(sender, instance, **kwargs):
     """Purge homepage product sections when any product data changes."""
-    revalidate_nextjs(['products'])
+    revalidate_after_commit(['products'])
 
 
 @receiver([post_save, post_delete], sender=Category)
 @receiver([post_save, post_delete], sender=Subcategory)
 def category_changed(sender, instance, **kwargs):
     """Purge categories and products when navigation structure changes."""
-    revalidate_nextjs(['categories', 'products'])
+    revalidate_after_commit(['categories', 'products'])
 
 
 @receiver([post_save, post_delete], sender=InstagramPost)
 def instagram_post_changed(sender, instance, **kwargs):
     """Purge the instagram gallery section."""
-    revalidate_nextjs(['instagram'])
+    revalidate_after_commit(['instagram'])
 
 
 @receiver([post_save, post_delete], sender=HeroSlider)
 def hero_slider_changed(sender, instance, **kwargs):
     """Purge the hero slider section."""
-    revalidate_nextjs(['hero'])
+    revalidate_after_commit(['hero'])
