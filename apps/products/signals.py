@@ -8,21 +8,44 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _clean_env_value(value):
+    """Normalize env/config strings (trim spaces + accidental quotes)."""
+    if value is None:
+        return ''
+    if not isinstance(value, str):
+        return str(value)
+    return value.strip().strip('"').strip("'")
+
+
 def revalidate_nextjs(tags):
     """
     Calls the Next.js /api/revalidate endpoint to purge its ISR cache
     for the given tags. Called after any admin save/delete on content
     that is displayed on cached pages (homepage sections, etc.).
     """
-    frontend_url = getattr(settings, 'FRONTEND_URL', '')
-    secret = getattr(settings, 'REVALIDATION_SECRET', '')
+    frontend_url = _clean_env_value(getattr(settings, 'FRONTEND_URL', ''))
+    secret = _clean_env_value(getattr(settings, 'REVALIDATION_SECRET', ''))
+
+    # Fallback: if FRONTEND_URL is missing, use the first CORS origin.
+    if not frontend_url:
+        cors_origins = getattr(settings, 'CORS_ALLOWED_ORIGINS', []) or []
+        if cors_origins:
+            frontend_url = _clean_env_value(cors_origins[0])
 
     if not frontend_url or not secret:
+        missing = []
+        if not frontend_url:
+            missing.append('FRONTEND_URL')
+        if not secret:
+            missing.append('REVALIDATION_SECRET')
         logger.warning(
-            "Next.js revalidation skipped: FRONTEND_URL or REVALIDATION_SECRET "
-            "is not set in settings/environment variables."
+            "Next.js revalidation skipped: missing %s.",
+            ", ".join(missing),
         )
         return
+
+    if not frontend_url.startswith(('http://', 'https://')):
+        frontend_url = f"https://{frontend_url}"
 
     frontend_url = frontend_url.rstrip('/')
 
