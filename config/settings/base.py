@@ -233,9 +233,11 @@ WHATSAPP_API_TOKEN = config('WHATSAPP_API_TOKEN', default='')
 WHATSAPP_PHONE_NUMBER_ID = config('WHATSAPP_PHONE_NUMBER_ID', default='')
 
 # ──────────────────────────────────────────────
-# Frontend URL
+# Frontend URL & Cache Revalidation
 # ──────────────────────────────────────────────
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+# Must match REVALIDATION_SECRET on the Vercel/Next.js side
+REVALIDATION_SECRET = config('REVALIDATION_SECRET', default='')
 
 # ──────────────────────────────────────────────
 # Store Info
