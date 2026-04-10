@@ -223,14 +223,15 @@ class QuickPicksListView(generics.ListAPIView):
 
 
 class NewArrivalsListView(generics.ListAPIView):
-    """GET /api/products/homepage/new-arrivals/ — Top 5 newest products."""
+    """GET /api/products/homepage/new-arrivals/ — Admin-curated new arrival products."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
 
     def get_queryset(self):
         return Product.objects.filter(
-            is_active=True
-        ).select_related('category', 'subcategory').order_by('-created_at')[:5]
+            is_active=True,
+            is_new_arrival=True
+        ).select_related('category', 'subcategory')[:5]
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)

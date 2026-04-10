@@ -69,6 +69,7 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     is_bestseller = models.BooleanField(default=False)
     is_quick_pick = models.BooleanField(default=False)
+    is_new_arrival = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -40,8 +40,8 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'subcategory', 'base_price', 'is_bestseller', 'is_quick_pick', 'is_active', 'total_stock', 'created_at')
-    list_filter = ('is_active', 'is_bestseller', 'is_quick_pick', 'category', 'subcategory', 'created_at')
+    list_display = ('name', 'category', 'subcategory', 'base_price', 'is_bestseller', 'is_quick_pick', 'is_new_arrival', 'is_active', 'total_stock', 'created_at')
+    list_filter = ('is_active', 'is_bestseller', 'is_quick_pick', 'is_new_arrival', 'category', 'subcategory', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('id', 'created_at', 'updated_at')
     inlines = [ProductVariantInline, ProductImageInline]
@@ -54,7 +54,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('category', 'subcategory')
         }),
         ('Status', {
-            'fields': ('is_active', 'is_bestseller', 'is_quick_pick')
+            'fields': ('is_active', 'is_bestseller', 'is_quick_pick', 'is_new_arrival')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
