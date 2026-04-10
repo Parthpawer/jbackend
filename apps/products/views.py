@@ -199,7 +199,7 @@ class BestSellerListView(generics.ListAPIView):
         return Product.objects.filter(
             is_active=True, 
             is_bestseller=True
-        ).select_related('category', 'subcategory')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -215,7 +215,7 @@ class QuickPicksListView(generics.ListAPIView):
         return Product.objects.filter(
             is_active=True, 
             is_quick_pick=True
-        ).select_related('category', 'subcategory')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -231,7 +231,7 @@ class NewArrivalsListView(generics.ListAPIView):
         return Product.objects.filter(
             is_active=True,
             is_new_arrival=True
-        ).select_related('category', 'subcategory')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
