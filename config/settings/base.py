@@ -145,7 +145,9 @@ CLOUDINARY_STORAGE = {
 }
 STORAGES = {
     "default": {
-        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        # Custom backend: converts images to JPEG before uploading to Cloudinary
+        # to reduce file sizes and protect credit limits.
+        "BACKEND": "config.storage.JPEGCloudinaryStorage",
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

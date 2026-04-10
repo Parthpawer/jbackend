@@ -17,8 +17,8 @@ media/
 .env.*.local
 venv/
 env/
-.venv/
 .env.*
+.venv/
 
 # ──── IDE ────
 .vscode/
