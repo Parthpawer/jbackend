@@ -55,6 +55,25 @@ class Subcategory(models.Model):
         return self.image.url if self.image else ''
 
 
+class CoatingType(models.Model):
+    """Database of available coating types (e.g. 18kt Yellow Gold)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True, help_text="Name of the coating (e.g., 18kt Yellow Gold)")
+    color_rgb = models.CharField(max_length=50, blank=True, default='#CCCCCC', help_text="Hex or RGB value (e.g., #E5A01D)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'coating_types'
+        verbose_name = 'Coating Type'
+        verbose_name_plural = 'Coating Types'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Product(models.Model):
     """A jewelry product."""
 
@@ -67,6 +86,8 @@ class Product(models.Model):
     description = models.TextField()
     styling = models.TextField(blank=True, default='')
     base_price = models.DecimalField(max_digits=12, decimal_places=2)
+    discounted_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    discount_text = models.CharField(max_length=255, blank=True, default='')
     is_active = models.BooleanField(default=True)
     is_bestseller = models.BooleanField(default=False)
     is_quick_pick = models.BooleanField(default=False)
@@ -105,6 +126,7 @@ class ProductVariant(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    coating = models.ForeignKey(CoatingType, on_delete=models.SET_NULL, null=True, blank=True, related_name='variants')
     metal_type = models.CharField(max_length=100, help_text='e.g. 18k Rose Gold, 22k Gold')
     size = models.CharField(max_length=50, blank=True, default='', help_text='Ring size, bangle diameter, etc.')
     price = models.DecimalField(max_digits=12, decimal_places=2)

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost
+from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost, CoatingType
 
 
 class SubcategoryInline(admin.TabularInline):
@@ -29,7 +29,7 @@ class SubcategoryAdmin(admin.ModelAdmin):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 1
-    fields = ('metal_type', 'size', 'price', 'stock', 'sku')
+    fields = ('coating', 'metal_type', 'size', 'price', 'stock', 'sku')
 
 
 class ProductImageInline(admin.TabularInline):
@@ -40,7 +40,12 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'subcategory', 'base_price', 'is_bestseller', 'is_quick_pick', 'is_new_arrival', 'is_active', 'total_stock', 'created_at')
+    list_display = (
+    'name', 'category', 'subcategory',
+    'base_price', 'discounted_price', 'discount_text',
+    'is_bestseller', 'is_quick_pick', 'is_new_arrival',
+    'is_active', 'total_stock', 'created_at'
+    )
     list_filter = ('is_active', 'is_bestseller', 'is_quick_pick', 'is_new_arrival', 'category', 'subcategory', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('id', 'created_at', 'updated_at')
@@ -48,7 +53,10 @@ class ProductAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Product Info', {
-            'fields': ('id', 'name', 'description', 'styling', 'base_price')
+            'fields': (
+        'id', 'name', 'description', 'styling',
+        'base_price', 'discounted_price', 'discount_text'
+    )
         }),
         ('Categorization', {
             'fields': ('category', 'subcategory')
@@ -69,9 +77,15 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ('product', 'metal_type', 'size', 'price', 'stock', 'sku')
-    list_filter = ('metal_type',)
-    search_fields = ('product__name', 'sku', 'metal_type')
+    list_display = ('product', 'coating', 'metal_type', 'size', 'price', 'stock', 'sku')
+    list_filter = ('coating', 'metal_type',)
+    search_fields = ('product__name', 'sku', 'coating__name', 'metal_type')
+
+
+@admin.register(CoatingType)
+class CoatingTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'color_rgb')
+    search_fields = ('name',)
 
 
 @admin.register(ProductImage)

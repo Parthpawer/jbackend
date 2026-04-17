@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost
+from .models import Category, Subcategory, Product, ProductVariant, ProductImage, HeroSlider, InstagramPost, CoatingType
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -8,12 +8,19 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ('id', 'cloudinary_url', 'is_primary', 'display_order')
 
 
+class CoatingTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoatingType
+        fields = ('id', 'name', 'color_rgb')
+
+
 class ProductVariantSerializer(serializers.ModelSerializer):
     low_stock = serializers.SerializerMethodField()
+    coating = CoatingTypeSerializer(read_only=True)
 
     class Meta:
         model = ProductVariant
-        fields = ('id', 'metal_type', 'size', 'price', 'stock', 'sku', 'low_stock')
+        fields = ('id', 'coating', 'metal_type', 'size', 'price', 'stock', 'sku', 'low_stock')
 
     def get_low_stock(self, obj):
         return obj.stock < 5
@@ -29,7 +36,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = (
-            'id', 'name', 'base_price', 'min_price', 'primary_image',
+            'id', 'name', 'base_price', 'min_price', 'primary_image', 'discounted_price', 'discount_text',
             'category_name', 'subcategory_name', 'is_bestseller', 'is_quick_pick', 'is_new_arrival', 'created_at'
         )
 
@@ -47,7 +54,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = (
-            'id', 'name', 'description', 'styling', 'base_price', 'is_active', 'is_bestseller', 'is_quick_pick', 'is_new_arrival',
+            'id', 'name', 'description', 'styling', 'base_price', 'discount_text','discounted_price','is_active', 'is_bestseller', 'is_quick_pick', 'is_new_arrival',
             'category', 'category_name', 'category_slug',
             'subcategory', 'subcategory_name', 'subcategory_slug',
             'images', 'variants', 'total_stock', 'created_at'
