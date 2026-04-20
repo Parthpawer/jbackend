@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import razorpay
 from django.conf import settings
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -14,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.cart.models import Cart
+from apps.products.models import ProductImage
 from apps.users.models import Address
 from .models import Order, OrderItem, OrderStatusHistory, PaymentHistory
 from .serializers import (
@@ -24,6 +26,22 @@ from .serializers import (
 )
 
 logger = logging.getLogger('apps.orders')
+
+
+def _order_items_prefetch():
+    """Prefetch spec for order items with all nested relations."""
+    from apps.products.models import ProductVariant
+    return Prefetch(
+        'items',
+        queryset=OrderItem.objects.select_related(
+            'variant__product__category',
+        ).prefetch_related(
+            Prefetch(
+                'variant__product__images',
+                queryset=ProductImage.objects.order_by('display_order'),
+            )
+        )
+    )
 
 
 def api_response(data=None, message='Success', success=True, status_code=status.HTTP_200_OK):
@@ -253,7 +271,9 @@ class OrderListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        orders = Order.objects.filter(user=request.user)
+        orders = Order.objects.filter(user=request.user).prefetch_related(
+            _order_items_prefetch()
+        ).order_by('-created_at')
         serializer = OrderListSerializer(orders, many=True)
         return api_response(serializer.data)
 
@@ -263,7 +283,13 @@ class OrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        order = get_object_or_404(Order, pk=pk, user=request.user)
+        order = get_object_or_404(
+            Order.objects.prefetch_related(
+                _order_items_prefetch(),
+                Prefetch('status_history', queryset=OrderStatusHistory.objects.order_by('changed_at')),
+            ),
+            pk=pk, user=request.user
+        )
         serializer = OrderDetailSerializer(order)
         return api_response(serializer.data)
 

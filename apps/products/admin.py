@@ -53,10 +53,7 @@ class ProductAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Product Info', {
-            'fields': (
-        'id', 'name', 'description', 'styling',
-        'base_price', 'discounted_price', 'discount_text'
-    )
+            'fields': ('id', 'name', 'description', 'styling', 'base_price', 'discounted_price', 'discount_text')
         }),
         ('Categorization', {
             'fields': ('category', 'subcategory')

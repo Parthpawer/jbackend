@@ -86,8 +86,8 @@ class Product(models.Model):
     description = models.TextField()
     styling = models.TextField(blank=True, default='')
     base_price = models.DecimalField(max_digits=12, decimal_places=2)
-    discounted_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    discount_text = models.CharField(max_length=255, blank=True, default='')
+    discounted_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text='Set this to override base_price with a discount')
+    discount_text = models.CharField(max_length=50, blank=True, default='', help_text='e.g. "Save 20%", "Sale"')
     is_active = models.BooleanField(default=True)
     is_bestseller = models.BooleanField(default=False)
     is_quick_pick = models.BooleanField(default=False)
@@ -100,6 +100,12 @@ class Product(models.Model):
         verbose_name = 'Product'
         verbose_name_plural = 'Products'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_active', 'is_bestseller', '-updated_at', '-created_at'], name='idx_product_bestseller'),
+            models.Index(fields=['is_active', 'is_quick_pick', '-updated_at', '-created_at'], name='idx_product_quickpick'),
+            models.Index(fields=['is_active', 'is_new_arrival', '-updated_at', '-created_at'], name='idx_product_newarrival'),
+            models.Index(fields=['is_active', '-created_at'], name='idx_product_active_created'),
+        ]
 
     def __str__(self):
         return self.name

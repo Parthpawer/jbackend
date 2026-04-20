@@ -1,8 +1,12 @@
+from django.db.models import Min, OuterRef, Subquery, CharField, Prefetch
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from .models import Category, Subcategory, Product, HeroSlider, InstagramPost
+from .models import Category, Subcategory, Product, ProductImage, HeroSlider, InstagramPost
 from .serializers import (
     CategorySerializer,
     SubcategorySerializer,
@@ -22,6 +26,38 @@ def api_response(data=None, message='Success', success=True, status_code=status.
     }, status=status_code)
 
 
+def annotate_product_list(queryset):
+    """
+    Annotate a product queryset with:
+      - annotated_primary_image: URL of the primary (or first) image — zero extra queries
+      - annotated_min_price: cheapest variant price
+    Replaces N+1 property lookups in ProductListSerializer.
+    """
+    # Primary image subquery: prefer is_primary=True, fallback handled in serializer
+    primary_img_sq = ProductImage.objects.filter(
+        product=OuterRef('pk'), is_primary=True
+    ).order_by('display_order').values('image')[:1]
+
+    first_img_sq = ProductImage.objects.filter(
+        product=OuterRef('pk')
+    ).order_by('display_order').values('image')[:1]
+
+    from django.db.models.functions import Coalesce
+    from django.db.models import F
+
+    # Min variant price subquery
+    from apps.products.models import ProductVariant
+    min_price_sq = ProductVariant.objects.filter(
+        product=OuterRef('pk')
+    ).order_by('price').values('price')[:1]
+
+    return queryset.annotate(
+        annotated_min_price=Subquery(min_price_sq),
+    ).prefetch_related(
+        Prefetch('images', queryset=ProductImage.objects.order_by('display_order')),
+    )
+
+
 class ProductListView(generics.ListAPIView):
     """GET /api/products/ — List products with filters and search."""
     permission_classes = [AllowAny]
@@ -32,23 +68,11 @@ class ProductListView(generics.ListAPIView):
     ordering = ['-created_at']
 
     def get_queryset(self):
-        return Product.objects.filter(is_active=True).select_related('category', 'subcategory')
+        qs = Product.objects.filter(is_active=True).select_related('category', 'subcategory')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
-        
-        # --- DEBUG LOGGING ADDED FOR USER ---
-        print("\n" + "="*50)
-        print("🔍 DEBUG: Next.js is requesting Products list")
-        for product in response.data.get('results', []):
-            name = product.get('name', '')
-            img_url = product.get('primary_image', '')
-            print(f"[{name}] Image URL -> {img_url}")
-            if img_url and not any(img_url.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
-                print("   ⚠️ WARNING: This URL does NOT have a valid image extension (.jpg/.png/etc).")
-                print("   Next.js Image Optimizer WILL NOT render it! Please re-upload with an extension.")
-        print("="*50 + "\n")
-        
         return Response({
             'success': True,
             'data': response.data,
@@ -65,7 +89,10 @@ class ProductDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         return Product.objects.filter(is_active=True).select_related(
             'category', 'subcategory'
-        ).prefetch_related('variants', 'images')
+        ).prefetch_related(
+            Prefetch('variants'),
+            Prefetch('images', queryset=ProductImage.objects.order_by('display_order')),
+        )
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -73,14 +100,17 @@ class ProductDetailView(generics.RetrieveAPIView):
         return api_response(serializer.data, 'Product retrieved')
 
 
+@method_decorator(cache_page(60 * 15), name='dispatch')
 class CategoryListView(generics.ListAPIView):
-    """GET /api/categories/ — All active categories with subcategories."""
+    """GET /api/categories/ — All active categories with subcategories. Cached 15 min."""
     permission_classes = [AllowAny]
     serializer_class = CategorySerializer
+    pagination_class = None  # Categories are a small, fully-rendered nav list
 
     def get_queryset(self):
         return Category.objects.filter(is_active=True).prefetch_related(
-            'subcategories'
+            Prefetch('subcategories', queryset=Subcategory.objects.filter(is_active=True).order_by('display_order')),
+            'products',
         ).order_by('display_order')
 
     def list(self, request, *args, **kwargs):
@@ -93,31 +123,24 @@ class CategoryListView(generics.ListAPIView):
 
 
 class CategoryProductsView(generics.ListAPIView):
-    """GET /api/categories/{slug}/products/ — Products in a category."""
+    """GET /api/categories/{slug}/products/ — Products in a category (paginated)."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
+    filterset_class = ProductFilter
+    search_fields = ['name', 'description']
+    ordering_fields = ['base_price', 'created_at', 'name']
+    ordering = ['-created_at']
+    # Pagination inherited from global DRF settings (PAGE_SIZE=12)
 
     def get_queryset(self):
         slug = self.kwargs['slug']
-        return Product.objects.filter(
+        qs = Product.objects.filter(
             category__slug=slug, is_active=True
         ).select_related('category', 'subcategory')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
-        
-        # --- DEBUG LOGGING ---
-        print("\n" + "="*50)
-        print(f"🔍 DEBUG: Next.js is requesting products for category")
-        for product in response.data.get('results', []):
-            name = product.get('name', '')
-            img_url = product.get('primary_image', '')
-            print(f"[{name}] Image URL -> {img_url}")
-            if img_url and not any(img_url.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
-                print("   ⚠️ WARNING: This URL does NOT have a valid image extension (.jpg/.png/etc).")
-                print("   Next.js WILL NOT render it! Please re-upload with an extension.")
-        print("="*50 + "\n")
-
         return Response({
             'success': True,
             'data': response.data,
@@ -129,11 +152,12 @@ class CategorySubcategoriesView(generics.ListAPIView):
     """GET /api/categories/{slug}/subcategories/ — Subcategories under a category."""
     permission_classes = [AllowAny]
     serializer_class = SubcategorySerializer
+    pagination_class = None
 
     def get_queryset(self):
         slug = self.kwargs['slug']
         category = get_object_or_404(Category, slug=slug, is_active=True)
-        return Subcategory.objects.filter(category=category, is_active=True)
+        return Subcategory.objects.filter(category=category, is_active=True).prefetch_related('products')
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -145,15 +169,21 @@ class CategorySubcategoriesView(generics.ListAPIView):
 
 
 class SubcategoryProductsView(generics.ListAPIView):
-    """GET /api/subcategories/{slug}/products/ — Products in a subcategory."""
+    """GET /api/subcategories/{slug}/products/ — Products in a subcategory (paginated)."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
+    filterset_class = ProductFilter
+    search_fields = ['name', 'description']
+    ordering_fields = ['base_price', 'created_at', 'name']
+    ordering = ['-created_at']
+    # Pagination inherited from global DRF settings (PAGE_SIZE=12)
 
     def get_queryset(self):
         slug = self.kwargs['slug']
-        return Product.objects.filter(
+        qs = Product.objects.filter(
             subcategory__slug=slug, is_active=True
         ).select_related('category', 'subcategory')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -168,6 +198,7 @@ class HeroSliderListView(generics.ListAPIView):
     """GET /api/products/homepage/hero/ — Active hero sliders."""
     permission_classes = [AllowAny]
     serializer_class = HeroSliderSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return HeroSlider.objects.filter(is_active=True).order_by('display_order')
@@ -181,6 +212,7 @@ class InstagramPostListView(generics.ListAPIView):
     """GET /api/products/homepage/instagram/ — Active instagram posts."""
     permission_classes = [AllowAny]
     serializer_class = InstagramPostSerializer
+    pagination_class = None
 
     def get_queryset(self):
         return InstagramPost.objects.filter(is_active=True).order_by('display_order')
@@ -194,12 +226,14 @@ class BestSellerListView(generics.ListAPIView):
     """GET /api/products/homepage/bestsellers/ — Top 5 best selling products."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
+    pagination_class = None
 
     def get_queryset(self):
-        return Product.objects.filter(
-            is_active=True, 
+        qs = Product.objects.filter(
+            is_active=True,
             is_bestseller=True
-        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -210,12 +244,14 @@ class QuickPicksListView(generics.ListAPIView):
     """GET /api/products/homepage/quick-picks/ — Top 5 quick picks products."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
+    pagination_class = None
 
     def get_queryset(self):
-        return Product.objects.filter(
-            is_active=True, 
+        qs = Product.objects.filter(
+            is_active=True,
             is_quick_pick=True
-        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
@@ -226,13 +262,45 @@ class NewArrivalsListView(generics.ListAPIView):
     """GET /api/products/homepage/new-arrivals/ — Admin-curated new arrival products."""
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
+    pagination_class = None
 
     def get_queryset(self):
-        return Product.objects.filter(
+        qs = Product.objects.filter(
             is_active=True,
             is_new_arrival=True
-        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:5]
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')
+        return annotate_product_list(qs)
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
         return api_response(response.data, 'New arrivals retrieved')
+
+
+class HomepageDataView(APIView):
+    """
+    GET /api/products/homepage/all/ — Single aggregated endpoint for the homepage.
+    Returns hero sliders, bestsellers, quick picks, new arrivals, and instagram posts
+    in one shot, replacing 5 separate round-trips from Next.js.
+    """
+    permission_classes = [AllowAny]
+
+    def _get_products(self, filter_kwargs, limit=5):
+        qs = Product.objects.filter(
+            is_active=True, **filter_kwargs
+        ).select_related('category', 'subcategory').order_by('-updated_at', '-created_at')[:limit]
+        return annotate_product_list(qs)
+
+    def get(self, request):
+        hero_sliders = list(HeroSlider.objects.filter(is_active=True).order_by('display_order'))
+        instagram_posts = list(InstagramPost.objects.filter(is_active=True).order_by('display_order'))
+        bestsellers = list(self._get_products({'is_bestseller': True}))
+        quick_picks = list(self._get_products({'is_quick_pick': True}))
+        new_arrivals = list(self._get_products({'is_new_arrival': True}))
+
+        return api_response({
+            'hero_sliders': HeroSliderSerializer(hero_sliders, many=True).data,
+            'bestsellers': ProductListSerializer(bestsellers, many=True).data,
+            'quick_picks': ProductListSerializer(quick_picks, many=True).data,
+            'new_arrivals': ProductListSerializer(new_arrivals, many=True).data,
+            'instagram_posts': InstagramPostSerializer(instagram_posts, many=True).data,
+        }, 'Homepage data retrieved')

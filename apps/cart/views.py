@@ -3,9 +3,29 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db.models import Prefetch
 from .models import Cart, CartItem
 from .serializers import CartSerializer, CartItemCreateSerializer, CartItemUpdateSerializer
-from apps.products.models import ProductVariant
+from apps.products.models import ProductVariant, ProductImage
+
+
+def _cart_with_prefetch(user):
+    """Return the user's cart (creating if absent) with all related data prefetched in 3 queries."""
+    cart, _ = Cart.objects.get_or_create(user=user)
+    return Cart.objects.prefetch_related(
+        Prefetch(
+            'items',
+            queryset=CartItem.objects.select_related(
+                'variant__product__category',
+                'variant__product__subcategory',
+            ).prefetch_related(
+                Prefetch(
+                    'variant__product__images',
+                    queryset=ProductImage.objects.order_by('display_order'),
+                )
+            )
+        )
+    ).get(pk=cart.pk)
 
 
 def api_response(data=None, message='Success', success=True, status_code=status.HTTP_200_OK):
@@ -21,7 +41,7 @@ class CartView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart = _cart_with_prefetch(request.user)
         serializer = CartSerializer(cart)
         return api_response(serializer.data)
 
@@ -55,7 +75,7 @@ class CartItemAddView(APIView):
             cart_item.save()
 
         cart.save()  # Update timestamp
-        return api_response(CartSerializer(cart).data, 'Item added to cart')
+        return api_response(CartSerializer(_cart_with_prefetch(request.user)).data, 'Item added to cart')
 
 
 class CartItemUpdateView(APIView):
@@ -77,7 +97,7 @@ class CartItemUpdateView(APIView):
         cart_item.quantity = quantity
         cart_item.save()
         cart.save()
-        return api_response(CartSerializer(cart).data, 'Cart updated')
+        return api_response(CartSerializer(_cart_with_prefetch(request.user)).data, 'Cart updated')
 
 
 class CartItemDeleteView(APIView):
@@ -89,7 +109,7 @@ class CartItemDeleteView(APIView):
         cart_item = get_object_or_404(CartItem, pk=pk, cart=cart)
         cart_item.delete()
         cart.save()
-        return api_response(CartSerializer(cart).data, 'Item removed from cart')
+        return api_response(CartSerializer(_cart_with_prefetch(request.user)).data, 'Item removed from cart')
 
 
 class CartClearView(APIView):
@@ -100,4 +120,4 @@ class CartClearView(APIView):
         cart = get_object_or_404(Cart, user=request.user)
         cart.items.all().delete()
         cart.save()
-        return api_response(CartSerializer(cart).data, 'Cart cleared')
+        return api_response(CartSerializer(_cart_with_prefetch(request.user)).data, 'Cart cleared')

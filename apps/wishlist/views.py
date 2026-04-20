@@ -3,8 +3,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db.models import Prefetch
 from .models import Wishlist
 from .serializers import WishlistSerializer
+from apps.products.models import ProductImage
 
 
 def api_response(data=None, message='Success', success=True, status_code=status.HTTP_200_OK):
@@ -20,9 +22,17 @@ class WishlistListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        items = Wishlist.objects.filter(user=request.user).select_related('product__category')
+        items = Wishlist.objects.filter(user=request.user).select_related(
+            'product__category', 'product__subcategory'
+        ).prefetch_related(
+            Prefetch(
+                'product__images',
+                queryset=ProductImage.objects.order_by('display_order'),
+            )
+        )
         serializer = WishlistSerializer(items, many=True)
         return api_response(serializer.data)
+
 
 
 class WishlistAddView(APIView):
