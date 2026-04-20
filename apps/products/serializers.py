@@ -133,7 +133,7 @@ class CategoryListSerializer(serializers.ModelSerializer):
 class HeroSliderSerializer(serializers.ModelSerializer):
     class Meta:
         model = HeroSlider
-        fields = ('id', 'title', 'subtitle', 'link_url', 'cloudinary_url', 'display_order')
+        fields = ('id', 'title', 'subtitle', 'link_url', 'cloudinary_url', 'mobile_cloudinary_url', 'display_order')
 
 
 class InstagramPostSerializer(serializers.ModelSerializer):

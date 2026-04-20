@@ -191,6 +191,12 @@ class HeroSlider(models.Model):
     """Dynamic hero images for the homepage."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     image = models.ImageField(upload_to='hero_sliders/')
+    mobile_image = models.ImageField(
+        upload_to='hero_sliders/mobile/',
+        null=True,
+        blank=True,
+        help_text='Optional mobile-optimized hero image (recommended portrait ratio like 3:4).',
+    )
     title = models.CharField(max_length=255, blank=True, default='')
     subtitle = models.CharField(max_length=255, blank=True, default='')
     link_url = models.CharField(max_length=500, blank=True, default='')
@@ -210,6 +216,13 @@ class HeroSlider(models.Model):
     @property
     def cloudinary_url(self):
         return self.image.url if self.image else ''
+
+    @property
+    def mobile_cloudinary_url(self):
+        # Fallback to desktop image when a mobile-specific asset is not set.
+        if self.mobile_image:
+            return self.mobile_image.url
+        return self.cloudinary_url
 
 
 class InstagramPost(models.Model):

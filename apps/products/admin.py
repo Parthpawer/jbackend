@@ -93,9 +93,25 @@ class ProductImageAdmin(admin.ModelAdmin):
 
 @admin.register(HeroSlider)
 class HeroSliderAdmin(admin.ModelAdmin):
-    list_display = ('title', 'subtitle', 'is_active', 'display_order', 'created_at')
+    list_display = ('title', 'subtitle', 'is_active', 'display_order', 'has_mobile_image', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('title', 'subtitle')
+    fields = (
+        'title',
+        'subtitle',
+        'link_url',
+        'image',
+        'mobile_image',
+        'is_active',
+        'display_order',
+        'created_at',
+    )
+    readonly_fields = ('created_at',)
+
+    def has_mobile_image(self, obj):
+        return bool(obj.mobile_image)
+    has_mobile_image.boolean = True
+    has_mobile_image.short_description = 'Mobile Image'
 
 
 @admin.register(InstagramPost)
